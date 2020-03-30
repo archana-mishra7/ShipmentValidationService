@@ -31,7 +31,7 @@ namespace ShipmentValidation.Api.Controllers
         {
            try{
                 
-                using (var reader = new StreamReader("C:\\Users\\archana.mishra\\Documents\\SampleData\\ShipmentFormat.csv"))
+                using (var reader = new StreamReader("C:\\Users\\archana.mishra\\Documents\\SampleData\\ShipmentBusiness.csv"))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
                     
@@ -101,6 +101,7 @@ namespace ShipmentValidation.Api.Controllers
         public IEnumerable<Shipment> GetAllShipments(bool includeError = false)
         {
             LoadShipments();
+            AddBusinessValidation();
            
             //if(_shipments.Count>0)
             return _shipments;
@@ -111,10 +112,30 @@ namespace ShipmentValidation.Api.Controllers
         public IEnumerable<ShipmentErrorLog> GetAllErrors(string error)
         {
             LoadShipments();
+            AddBusinessValidation();
            
             //if(_shipments.Count>0)
             return _errorLogs;
         } 
+
+        private void AddBusinessValidation(){
+            var BadShipmentlist = new List<Shipment>();
+            foreach(var shipment in _shipments)
+            {
+                if(shipment.ShipmentOrigin == shipment.ShipmentDestination){
+                    var busineesError = new ShipmentErrorLog();
+                    busineesError.ErrorType = "Business error";
+                    busineesError.ErrorValue = "Origin and Destination cannot be same";
+                    _errorLogs.Add(busineesError);
+                    BadShipmentlist.Add(shipment);
+                }
+            }
+
+            foreach(var shipment in BadShipmentlist)
+            {
+                _shipments.Remove(shipment);
+            }
+        }
         
     }
 }
