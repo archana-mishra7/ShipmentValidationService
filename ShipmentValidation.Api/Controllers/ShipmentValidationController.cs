@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using ShipmentValidation.Api.Dtos;
 using System.Threading.Tasks;
+using System;
 
 namespace ShipmentValidation.Api.Controllers
 {
@@ -14,8 +15,9 @@ namespace ShipmentValidation.Api.Controllers
     [Route("api/[controller]")]
     public class ShipmentValidationController : ControllerBase
     {
-        private  List<Shipment> _shipments;
+        private  List<Shipment> _shipments = new List<Shipment>();
         private List<ShipmentErrorLog>  _errorLogs = new List<ShipmentErrorLog>();
+        bool isRecordBad = false;
         //public ShipmentValidationController(List<Shipment> shipments)
         //{
          //   _shipments = shipments;
@@ -27,10 +29,9 @@ namespace ShipmentValidation.Api.Controllers
         /// <returns></returns>
         private void LoadShipments()
         {
-            try
-            {
-                bool isRecordBad = false;
-                using (var reader = new StreamReader("C:\\Users\\archana.mishra\\Documents\\SampleData\\ShipmentFile.csv"))
+           try{
+                
+                using (var reader = new StreamReader("C:\\Users\\archana.mishra\\Documents\\SampleData\\ShipmentFormat.csv"))
                 using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                 {
                     
@@ -58,7 +59,20 @@ namespace ShipmentValidation.Api.Controllers
                         }
 
                     } ;
-                   _shipments= csv.GetRecords<Shipment>().ToList();                   
+                    csv.Configuration.ReadingExceptionOccurred = new System.Func<CsvHelperException, bool> (HandleReadException);
+                    while (csv.Read()){
+                        
+                        var record = csv.GetRecord<Shipment>();
+                        if (!(record == null))
+                        {
+                            //good.Add(record);
+                            _shipments.Add(record);
+                        }
+
+                        isRecordBad = false;
+                    }
+		
+                   //_shipments= csv.GetRecords<Shipment>().ToList();                   
 
                 }
             }
@@ -66,21 +80,41 @@ namespace ShipmentValidation.Api.Controllers
             {
                 var errorLog = new ShipmentErrorLog();
                 errorLog.ErrorType = "Shipment load Error";
-                errorLog.ErrorValue = ex.Message;
+                errorLog.ErrorValue = ex.Message + ex.InnerException;
                 _errorLogs.Add(errorLog);
             }
             
         }
 
+        private bool HandleReadException(CsvHelperException arg)
+        {
+            //isRecordBad = true;
+            var errorLog = new ShipmentErrorLog();
+            errorLog.ErrorType =arg.Message;
+            if(!(arg.InnerException == null))
+            errorLog.ErrorValue = arg.InnerException.ToString();
+            _errorLogs.Add(errorLog);
+            return false;
+        }
+
         [HttpGet]
-        public IActionResult GetAllShipments(bool includeError = false)
+        public IEnumerable<Shipment> GetAllShipments(bool includeError = false)
         {
             LoadShipments();
-            if(_errorLogs.Count>0)
-            return Ok(_errorLogs);
-            
-            return Ok(_shipments);
-        }  
+           
+            //if(_shipments.Count>0)
+            return _shipments;
+        } 
+
+        
+        [HttpGet("{error}")]
+        public IEnumerable<ShipmentErrorLog> GetAllErrors(string error)
+        {
+            LoadShipments();
+           
+            //if(_shipments.Count>0)
+            return _errorLogs;
+        } 
         
     }
 }
